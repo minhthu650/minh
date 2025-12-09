@@ -1,0 +1,1814 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wazuh SOC Flow Demo – Cinematic Visualization</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #00e5ff;
+      --primary-dark: #0097a7;
+      --secondary: #7c4dff;
+      --accent: #ff4081;
+      --bg-dark: #050505;
+      --bg-card: rgba(255, 255, 255, 0.05);
+      --text-primary: #eeeeee;
+      --text-secondary: #b0bec5;
+      --success: #00e676;
+      --warning: #ffd54f;
+      --danger: #ff5252;
+      --border-radius: 12px;
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      --glass: rgba(255, 255, 255, 0.08);
+      --glass-border: rgba(255, 255, 255, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      background:
+        radial-gradient(circle at 10% 0%, #283593 0%, var(--bg-dark) 40%, #000 100%),
+        linear-gradient(135deg, #0d1b2a 0%, #1b263b 100%);
+      color: var(--text-primary);
+      font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background:
+        radial-gradient(circle at 20% 80%, rgba(124, 77, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(0, 229, 255, 0.1) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .particles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .particle {
+      position: absolute;
+      background: rgba(0, 229, 255, 0.12);
+      border-radius: 50%;
+      animation: float 15s infinite linear;
+    }
+
+    @keyframes float {
+      0%, 100% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 0;
+      }
+      10%, 90% {
+        opacity: 0.3;
+      }
+      50% {
+        transform: translateY(-100px) rotate(180deg);
+        opacity: 0.5;
+      }
+    }
+
+    #app {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+      max-width: 1600px;
+      margin: 0 auto;
+      animation: fadeIn 1s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    #diagram {
+      flex: 1.2;
+      min-width: 0;
+    }
+
+    #control {
+      flex: 0.8;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 0;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 0;
+      margin-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .header-title {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .main-title {
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--text-secondary);
+      max-width: 600px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: rgba(0, 229, 255, 0.1);
+      border-radius: 20px;
+      border: 1px solid rgba(0, 229, 255, 0.3);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      gap: 16px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+    }
+
+    .section-title::before {
+      content: '';
+      width: 4px;
+      height: 20px;
+      background: linear-gradient(180deg, var(--primary), var(--secondary));
+      border-radius: 2px;
+    }
+
+    .layer-container {
+      position: relative;
+      margin-bottom: 30px;
+      padding: 20px;
+      background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.02),
+        rgba(0, 0, 0, 0.3));
+      border-radius: var(--border-radius);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      overflow: hidden;
+    }
+
+    .layer-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg,
+        transparent,
+        var(--primary),
+        transparent);
+    }
+
+    .layer-label {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 20px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: rgba(0, 229, 255, 0.05);
+      border-radius: var(--border-radius);
+      border-left: 4px solid var(--primary);
+      backdrop-filter: blur(10px);
+    }
+
+    .layer-label i {
+      color: var(--primary);
+    }
+
+    .node-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .node {
+      background: linear-gradient(135deg,
+        var(--glass),
+        rgba(0, 0, 0, 0.3));
+      border: 1px solid var(--glass-border);
+      border-radius: var(--border-radius);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: var(--transition);
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+    }
+
+    .node::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg,
+        transparent,
+        var(--primary),
+        transparent);
+      opacity: 0;
+      transition: var(--transition);
+    }
+
+    .node:hover {
+      transform: translateY(-8px);
+      border-color: rgba(0, 229, 255, 0.3);
+      box-shadow:
+        0 15px 40px rgba(0, 229, 255, 0.2),
+        0 8px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .node:hover::before {
+      opacity: 1;
+    }
+
+    @keyframes nodePulse {
+      0% {
+        box-shadow:
+          0 0 0 0 rgba(0, 229, 255, 0.45),
+          0 20px 40px rgba(0, 229, 255, 0.3);
+      }
+      70% {
+        box-shadow:
+          0 0 0 16px rgba(0, 229, 255, 0),
+          0 20px 40px rgba(0, 229, 255, 0.1);
+      }
+      100% {
+        box-shadow:
+          0 0 0 0 rgba(0, 229, 255, 0),
+          0 20px 40px rgba(0, 229, 255, 0.1);
+      }
+    }
+
+    .node.active {
+      border-color: var(--primary);
+      background: linear-gradient(135deg,
+        rgba(0, 229, 255, 0.15),
+        rgba(0, 0, 0, 0.4));
+      box-shadow:
+        0 0 0 1px var(--primary),
+        0 25px 50px rgba(0, 229, 255, 0.3);
+      animation: nodePulse 2s ease-out infinite;
+    }
+
+    .node.active::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center,
+        rgba(0, 229, 255, 0.12),
+        transparent 70%);
+      pointer-events: none;
+    }
+
+    .node-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+
+    .node-title {
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text-primary);
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .node-icon {
+      color: var(--primary);
+      font-size: 14px;
+    }
+
+    .node-tag {
+      font-size: 10px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      white-space: nowrap;
+      transition: var(--transition);
+    }
+
+    .node.active .node-tag {
+      background: rgba(0, 229, 255, 0.3);
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+    }
+
+    .node-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-top: 8px;
+    }
+
+    .node-stats {
+      display: flex;
+      gap: 12px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex: 1;
+    }
+
+    .stat-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .stat-label {
+      font-size: 9px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    #scenario-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .scenario-card {
+      padding: 20px;
+      background: linear-gradient(135deg,
+        rgba(40, 53, 147, 0.3),
+        rgba(13, 27, 42, 0.8));
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--border-radius);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition);
+      text-align: left;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .scenario-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg,
+        transparent,
+        rgba(0, 229, 255, 0.2),
+        transparent);
+      transition: left 0.6s;
+    }
+
+    .scenario-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--primary);
+      box-shadow: 0 10px 30px rgba(0, 229, 255, 0.2);
+    }
+
+    .scenario-card:hover::before {
+      left: 100%;
+    }
+
+    .scenario-card.active {
+      background: linear-gradient(135deg,
+        rgba(0, 229, 255, 0.2),
+        rgba(13, 27, 42, 0.9));
+      border-color: var(--primary);
+      box-shadow: 0 0 25px rgba(0, 229, 255, 0.3);
+    }
+
+    .scenario-number {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: 50%;
+      color: #000;
+      font-weight: 700;
+      text-align: center;
+      line-height: 32px;
+      font-size: 14px;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(0, 229, 255, 0.3);
+    }
+
+    .scenario-content {
+      flex: 1;
+    }
+
+    .scenario-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 4px;
+      color: var(--text-primary);
+    }
+
+    .scenario-desc {
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .scenario-icon {
+      color: var(--primary);
+      font-size: 16px;
+      margin-left: auto;
+      opacity: 0;
+      transform: translateX(-10px);
+      transition: var(--transition);
+    }
+
+    .scenario-card.active .scenario-icon {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    /* khung chung: map bên trái, log bên phải */
+    #flow-wrapper {
+      display: flex;
+      gap: 16px;
+      align-items: stretch;
+      margin-bottom: 24px;
+    }
+
+    #flow-wrapper #mini-container,
+    #flow-wrapper #log-panel {
+      flex: 1;
+    }
+
+    @media (max-width: 1200px) {
+      #flow-wrapper {
+        flex-direction: column;
+      }
+    }
+
+    #log-panel {
+      background: linear-gradient(135deg,
+        rgba(13, 27, 42, 0.9),
+        rgba(27, 38, 59, 0.9));
+      border-radius: var(--border-radius);
+      padding: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #log-panel::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: linear-gradient(180deg,
+        var(--primary),
+        var(--secondary),
+        var(--accent));
+      opacity: 0.8;
+    }
+
+    #scenario-title {
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 20px;
+      color: var(--text-primary);
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-left: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      line-height: 1.35;
+    }
+
+    #scenario-title i {
+      color: var(--primary);
+    }
+
+    #log {
+      height: 280px;
+      overflow-y: auto;
+      padding-right: 12px;
+      flex: 1;
+    }
+
+    #log::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    #log::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+    }
+
+    #log::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, var(--primary), var(--secondary));
+      border-radius: 4px;
+    }
+
+    .log-line {
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      border-left: 4px solid var(--primary);
+      animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      transition: var(--transition);
+    }
+
+    .log-line:hover {
+      transform: translateX(4px);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .log-step {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: #000;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 28px;
+      font-weight: 700;
+      font-size: 13px;
+      margin-right: 12px;
+      vertical-align: middle;
+      box-shadow: 0 4px 12px rgba(0, 229, 255, 0.3);
+    }
+
+    .log-node {
+      display: inline-block;
+      padding: 4px 10px;
+      background: rgba(0, 229, 255, 0.15);
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--primary);
+      margin: 0 12px;
+      border: 1px solid rgba(0, 229, 255, 0.3);
+    }
+
+    .log-desc {
+      display: inline-block;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .progress-container {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .progress-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .progress-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .progress-percent {
+      font-size: 12px;
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .progress-bar {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      width: 0%;
+      transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 3px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .progress-fill::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg,
+        transparent,
+        rgba(255, 255, 255, 0.3),
+        transparent);
+      animation: shimmer 2s infinite;
+    }
+
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    .timeline-indicator {
+      position: relative;
+      margin-top: 10px;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .timeline-current {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      transition: width 0.3s;
+      width: 0%;
+    }
+
+    .stats-panel {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-left: auto;
+      min-width: 300px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--glass), rgba(0, 0, 0, 0.4));
+      border-radius: var(--border-radius);
+      padding: 16px;
+      text-align: center;
+      border: 1px solid var(--glass-border);
+      transition: var(--transition);
+      backdrop-filter: blur(10px);
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--primary);
+      box-shadow: 0 10px 30px rgba(0, 229, 255, 0.1);
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 6px;
+      text-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    #mini-container {
+      background: linear-gradient(135deg,
+        rgba(13, 27, 42, 0.95),
+        rgba(27, 38, 59, 0.95));
+      border-radius: var(--border-radius);
+      padding: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #mini-container::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: calc(var(--border-radius) + 2px);
+      padding: 2px;
+      background: conic-gradient(
+        from 0deg,
+        var(--primary),
+        var(--secondary),
+        var(--accent),
+        var(--primary)
+      );
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0.5;
+      animation: borderRotate 20s linear infinite;
+    }
+
+    @keyframes borderRotate {
+      100% { transform: rotate(360deg); }
+    }
+
+    #mini-title {
+      font-size: 14px;
+      margin-bottom: 20px;
+      color: var(--text-primary);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #mini-title i {
+      color: var(--primary);
+    }
+
+    #mini-map {
+      width: 100%;
+      height: 380px;
+      display: block;
+    }
+
+    .mini-box {
+      fill: rgba(28, 40, 62, 0.9);
+      stroke: rgba(0, 229, 255, 0.3);
+      stroke-width: 1.5;
+      rx: 12;
+      ry: 12;
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+      transition: var(--transition);
+      cursor: pointer;
+    }
+
+    .mini-box:hover {
+      fill: rgba(0, 229, 255, 0.1);
+      stroke: var(--primary);
+      filter: drop-shadow(0 8px 24px rgba(0, 229, 255, 0.4));
+    }
+
+    .mini-label {
+      font-size: 12px;
+      fill: var(--text-primary);
+      font-weight: 600;
+      pointer-events: none;
+      text-anchor: middle;
+    }
+
+    .mini-sub {
+      font-size: 10px;
+      fill: var(--text-secondary);
+      pointer-events: none;
+      text-anchor: middle;
+    }
+
+    .link-line {
+      stroke: rgba(0, 229, 255, 0.25);
+      stroke-width: 2;
+      stroke-dasharray: 5, 5;
+      fill: none;
+      animation: dashMove 30s linear infinite;
+      transition: stroke 0.3s ease, stroke-width 0.3s ease, opacity 0.3s ease;
+    }
+
+    .link-line.active-path {
+      stroke: var(--primary);
+      stroke-width: 3;
+      opacity: 1;
+    }
+
+    @keyframes dashMove {
+      0% { stroke-dashoffset: 0; }
+      100% { stroke-dashoffset: 1000; }
+    }
+
+    #flowDot {
+      fill: var(--primary);
+      stroke: #fff;
+      stroke-width: 2.5;
+      filter:
+        drop-shadow(0 0 12px var(--primary))
+        drop-shadow(0 0 25px var(--primary));
+      animation: dotGlow 1.5s ease-in-out infinite;
+      z-index: 10;
+    }
+
+    @keyframes dotGlow {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.7;
+      }
+    }
+
+    .tooltip {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.95);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 1000;
+      border: 1px solid var(--primary);
+      max-width: 300px;
+      backdrop-filter: blur(10px);
+      transform: translate(-50%, -110%);
+      line-height: 1.5;
+    }
+
+    .alert-banner {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, rgba(255, 82, 82, 0.9), rgba(183, 28, 28, 0.9));
+      color: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      border-left: 4px solid var(--danger);
+      display: none;
+      align-items: center;
+      gap: 12px;
+      animation: slideInRight 0.3s ease-out;
+      z-index: 1000;
+      backdrop-filter: blur(10px);
+    }
+
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(100%);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @media (max-width: 1400px) {
+      #app {
+        flex-direction: column;
+      }
+      #diagram, #control {
+        width: 100%;
+      }
+      .stats-panel {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 12px;
+      }
+      .node-grid {
+        grid-template-columns: 1fr;
+      }
+      #scenario-buttons {
+        grid-template-columns: 1fr;
+      }
+      .stat-card {
+        padding: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="particles" id="particles"></div>
+
+  <div class="alert-banner" id="alertBanner">
+    <i class="fas fa-exclamation-triangle"></i>
+    <div>
+      <strong>Threat Detected!</strong>
+      <div style="font-size: 12px;">Brute-force attack detected on Windows Victim</div>
+    </div>
+  </div>
+
+  <div id="app">
+    <div class="header">
+      <div class="header-title">
+        <div class="main-title">Wazuh SOC Flow Visualization</div>
+        <div class="subtitle">
+          Real-time simulation of security events flow through the Wazuh platform with MITRE ATT&CK mapping.
+        </div>
+      </div>
+      <div class="status-badge">
+        <div class="status-dot"></div>
+        <span>LIVE MONITORING</span>
+      </div>
+    </div>
+
+    <div id="diagram">
+      <div class="section-header">
+        <div class="section-title">Security Architecture Layers</div>
+        <div class="stats-panel">
+          <div class="stat-card">
+            <div class="stat-value">4</div>
+            <div class="stat-label">Attack Scenarios</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">14</div>
+            <div class="stat-label">Security Components</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">100%</div>
+            <div class="stat-label">Real-time Coverage</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="mitre-count">16</div>
+            <div class="stat-label">MITRE Techniques</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- các layer phía trái giữ nguyên như trước -->
+      <!-- Threat Actors -->
+      <div class="layer-container">
+        <div class="layer-label">
+          <i class="fas fa-user-secret"></i>
+          Threat Actors & Sources
+        </div>
+        <div class="node-grid">
+          <div class="node" id="external" data-tooltip="External attacker hoặc threat actor khởi tạo tấn công vào hệ thống từ bên ngoài mạng.">
+            <div class="node-header">
+              <div class="node-title">
+                <i class="fas fa-globe-americas node-icon"></i>
+                External Threat Actor
+              </div>
+              <div class="node-tag">External</div>
+            </div>
+            <div class="node-sub">
+              Attacker / Kali Linux / Internet-based threats với mục tiêu brute-force, exploit và malware.
+            </div>
+            <div class="node-stats">
+              <div class="stat">
+                <div class="stat-value">75%</div>
+                <div class="stat-label">Attack Source</div>
+              </div>
+              <div class="stat">
+                <div class="stat-value">120</div>
+                <div class="stat-label">IPs Tracked</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="node" id="internal" data-tooltip="User nội bộ thao tác trên Windows Victim (đăng nhập, tạo file, chạy ứng dụng).">
+            <div class="node-header">
+              <div class="node-title">
+                <i class="fas fa-user node-icon"></i>
+                Internal User
+              </div>
+              <div class="node-tag">Internal</div>
+            </div>
+            <div class="node-sub">
+              Legitimate users on Windows Victim – có thể gây ra sự cố bảo mật do lỗi hoặc cố ý.
+            </div>
+            <div class="node-stats">
+              <div class="stat">
+                <div class="stat-value">25%</div>
+                <div class="stat-label">Change Events</div>
+              </div>
+              <div class="stat">
+                <div class="stat-value">3</div>
+                <div class="stat-label">Demo Users</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Network & Perimeter -->
+      <div class="layer-container">
+        <div class="layer-label">
+          <i class="fas fa-network-wired"></i>
+          Network & Perimeter Security
+        </div>
+        <div class="node-grid">
+          <div class="node" id="router" data-tooltip="Router / NAT trong VirtualBox hoặc modem định tuyến traffic giữa Internet, host và máy ảo.">
+            <div class="node-header">
+              <div class="node-title">
+                <i class="fas fa-exchange-alt node-icon"></i>
+                Router / NAT Gateway
+              </div>
+              <div class="node-tag">Network</div>
+            </div>
+            <div class="node-sub">
+              VirtualBox NAT / Host-only, modem, router – điều phối lưu lượng, NAT IP và làm entry point cho traffic.
+            </div>
+          </div>
+          <div class="node" id="fw" data-tooltip="Firewall / ACL lọc lưu lượng, log các kết nối nghi vấn và chặn port không an toàn.">
+            <div class="node-header">
+              <div class="node-title">
+                <i class="fas fa-shield-alt node-icon"></i>
+                Firewall / ACL
+              </div>
+              <div class="node-tag">Firewall</div>
+            </div>
+            <div class="node-sub">
+              Windows Firewall, UFW/iptables, ACL trên router – kiểm soát truy cập, ghi log inbound / outbound traffic.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Endpoints -->
+      <div class="layer-container">
+        <div class="layer-label">
+          <i class="fas fa-desktop"></i>
+          Monitored Endpoints
+        </div>
+        <div class="node-grid">
+          <div class="node" id="win" data-tooltip="Máy nạn nhân chạy Windows, có Wazuh Agent để thu thập log, sự kiện và dữ liệu FIM/SCA.">
+            <div class="node-header">
+              <div class="node-title">
+                <i class="fas fa-laptop-code node-icon"></i>
+                Windows Victim Machine
+              </div>
+              <div class="node-tag">Endpoint</div>
+            </div>
+            <div class="node-sub">
+              Laptop MinhThu / Windows với Wazuh Agent – sinh Windows Event Log, thay đổi file, tiến trình, registry…
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent modules -->
+      <div class="layer-container">
+        <div class="layer-label">
+          <i class="fas fa-shield-virus"></i>
+          Wazuh Agent Security Modules
+        </div>
+        <div class="node-grid">
+          <div class="node" id="hids" data-tooltip="HIDS thu thập Windows Event Logs, phát hiện brute-force, đăng nhập thất bại, escalation bất thường.">
+            <div class="node-header">
+              <div class="node-title">
+                <i class="fas fa-eye node-icon"></i>
+                HIDS
+              </div>
+              <div class="node-tag">Detection</div>
+            </div>
+            <div class="node-sub">
+              Thu thập Security/System/Application logs, áp dụng rules để phát hiện brute-force, privilege abuse, anomaly.
+            </div>
+          </div>
+
+          <div class="node" id="fim" data-tooltip="FIM giám sát toàn vẹn file: tạo, sửa, xóa, thay đổi quyền và hash.">
+            <div class="node-header">
+              <div class="node-title">
+                <i class="fas fa-file-alt node-icon"></i>
+                FIM
+              </div>
+              <div class="node-tag">Integrity</div>
+            </div>
+            <div class="node-sub">
+              Monitor thư mục nhạy cảm (như C:\Users\Public\FIM-Test), ghi nhận added/modified/deleted với chi tiết hash.
+            </div>
+          </div>
+
+          <div class="node" id="malware" data-tooltip="Module IOC / Rootcheck so khớp hash file, IP, domain với danh sách IOC.">
+            <div class="node-header">
+              <div class="node-title">
+                <i class="fas fa-bug node-icon"></i>
+                Malware Detection
+              </div>
+              <div class="node-tag">IOC</div>
+            </div>
+            <div class="node-sub">
+              Kiểm tra hash file, IP, domain so với IOC list (malware-hashes, malicious-ip, malicious-domains) để phát hiện mã độc.
+            </div>
+          </div>
+
+          <div class="node" id="sca" data-tooltip="SCA kiểm tra cấu hình hệ thống theo CIS benchmark, trả về PASS/FAIL cho từng rule.">
+            <div class="node-header">
+              <div class="node-title">
+                <i class="fas fa-clipboard-check node-icon"></i>
+                SCA
+              </div>
+              <div class="node-tag">Hardening</div>
+            </div>
+            <div class="node-sub">
+              Security Configuration Assessment: kiểm tra policy, services, registry, password policy theo CIS Windows benchmark.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SIEM core -->
+      <div class="layer-container">
+        <div class="layer-label">
+          <i class="fas fa-server"></i>
+          SIEM & Analytics Core
+        </div>
+        <div class="node-grid">
+          <div class="node" id="manager" data-tooltip="Wazuh Manager làm nhiệm vụ decoding, rule matching, correlation và sinh alert.">
+            <div class="node-header">
+              <div class="node-title">
+                <i class="fas fa-project-diagram node-icon"></i>
+                Wazuh Manager
+              </div>
+              <div class="node-tag">SIEM</div>
+            </div>
+            <div class="node-sub">
+              Nhận sự kiện từ Agents, giải mã (decoders), so khớp rules, correlation và sinh alert với mức độ nghiêm trọng.
+            </div>
+          </div>
+
+          <div class="node" id="indexer" data-tooltip="Wazuh Indexer (OpenSearch/Elasticsearch) lưu trữ và index log + alert.">
+            <div class="node-header">
+              <div class="node-title">
+                <i class="fas fa-database node-icon"></i>
+                Wazuh Indexer
+              </div>
+              <div class="node-tag">Storage</div>
+            </div>
+            <div class="node-sub">
+              Lưu trữ log, alert, kết quả SCA/FIM/HIDS, hỗ trợ truy vấn, dashboard, reporting và threat hunting.
+            </div>
+          </div>
+
+          <div class="node" id="dashboard" data-tooltip="Wazuh Dashboard là giao diện trực quan để xem alert, MITRE mapping, trạng thái agent.">
+            <div class="node-header">
+              <div class="node-title">
+                <i class="fas fa-chart-line node-icon"></i>
+                Wazuh Dashboard
+              </div>
+              <div class="node-tag">UI</div>
+            </div>
+            <div class="node-sub">
+              Trình bày alert, MITRE ATT&CK matrix, status agent, các tab Security Events, FIM, SCA, Threat Hunting…
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Threat intel -->
+      <div class="layer-container">
+        <div class="layer-label">
+          <i class="fas fa-search"></i>
+          Threat Intelligence & Hunting
+        </div>
+        <div class="node-grid">
+          <div class="node" id="mitre" data-tooltip="MITRE ATT&CK mapping ánh xạ alert vào tactic/technique cụ thể.">
+            <div class="node-header">
+              <div class="node-title">
+                <i class="fas fa-th node-icon"></i>
+                MITRE ATT&CK
+              </div>
+              <div class="node-tag">Intel</div>
+            </div>
+            <div class="node-sub">
+              Ma trận tactic / technique (Initial Access, Execution, Persistence, …) giúp hiểu bức tranh TTP toàn cảnh.
+            </div>
+          </div>
+
+          <div class="node" id="hunting" data-tooltip="Threat hunting dùng log/alert, IOC để truy tìm thêm host, user, process liên quan.">
+            <div class="node-header">
+              <div class="node-title">
+                <i class="fas fa-search-plus node-icon"></i>
+                Threat Hunting
+              </div>
+              <div class="node-tag">Hunting</div>
+            </div>
+            <div class="node-sub">
+              Phân tích sâu theo IP, user, process, timeline; truy vấn Indexer để tìm lateral movement và scope của cuộc tấn công.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="control">
+      <div class="section-header">
+        <div class="section-title">Attack Scenarios</div>
+      </div>
+
+      <div id="scenario-buttons">
+        <div class="scenario-card" data-scenario="hids" onclick="runScenario('hids')">
+          <div class="scenario-number">1</div>
+          <div class="scenario-content">
+            <div class="scenario-title">Brute-force Attack (HIDS)</div>
+            <div class="scenario-desc">
+              External Threat Actor brute-force dịch vụ trên Windows Victim. HIDS phát hiện chuỗi đăng nhập lỗi.
+            </div>
+          </div>
+          <i class="fas fa-chevron-right scenario-icon"></i>
+        </div>
+
+        <div class="scenario-card" data-scenario="fim" onclick="runScenario('fim')">
+          <div class="scenario-number">2</div>
+          <div class="scenario-content">
+            <div class="scenario-title">Critical File Changes (FIM)</div>
+            <div class="scenario-desc">
+              Internal User tạo / sửa / xóa file trong thư mục FIM-Test, sinh alert FIM trên Dashboard.
+            </div>
+          </div>
+          <i class="fas fa-chevron-right scenario-icon"></i>
+        </div>
+
+        <div class="scenario-card" data-scenario="malware" onclick="runScenario('malware')">
+          <div class="scenario-number">3</div>
+          <div class="scenario-content">
+            <div class="scenario-title">Malware / IOC Detection</div>
+            <div class="scenario-desc">
+              File có hash trùng IOC hoặc kết nối đến IP/domain độc hại, bị module IOC đánh dấu High severity.
+            </div>
+          </div>
+          <i class="fas fa-chevron-right scenario-icon"></i>
+        </div>
+
+        <div class="scenario-card" data-scenario="sca" onclick="runScenario('sca')">
+          <div class="scenario-number">4</div>
+          <div class="scenario-content">
+            <div class="scenario-title">Hardening Assessment (SCA)</div>
+            <div class="scenario-desc">
+              Wazuh Agent quét cấu hình theo CIS, tạo báo cáo PASS/FAIL và tiến độ hardening cho Windows Victim.
+            </div>
+          </div>
+          <i class="fas fa-chevron-right scenario-icon"></i>
+        </div>
+      </div>
+
+      <div id="flow-wrapper">
+        <div id="mini-container">
+          <div id="mini-title">
+            <i class="fas fa-route"></i>
+            Interactive Flow Map – Blue dot follows the security event path
+          </div>
+          <svg id="mini-map" viewBox="0 0 700 380">
+            <defs>
+              <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto">
+                <path d="M0,0 L7,3.5 L0,7 Z" fill="#00e5ff"></path>
+              </marker>
+            </defs>
+
+            <rect class="mini-box" x="40" y="20" width="120" height="40"/>
+            <text class="mini-label" x="100" y="35">External</text>
+            <text class="mini-sub" x="100" y="50">Attacker / Kali</text>
+
+            <rect class="mini-box" x="40" y="120" width="140" height="40"/>
+            <text class="mini-label" x="110" y="135">Internal User</text>
+            <text class="mini-sub" x="110" y="150">User on Victim</text>
+
+            <rect class="mini-box" x="220" y="20" width="120" height="40"/>
+            <text class="mini-label" x="280" y="35">Router / NAT</text>
+            <text class="mini-sub" x="280" y="50">VirtualBox / Router</text>
+
+            <rect class="mini-box" x="400" y="20" width="120" height="40"/>
+            <text class="mini-label" x="460" y="35">Firewall / ACL</text>
+            <text class="mini-sub" x="460" y="50">Filtering / Logs</text>
+
+            <rect class="mini-box" x="260" y="120" width="160" height="40"/>
+            <text class="mini-label" x="340" y="135">Windows Victim</text>
+            <text class="mini-sub" x="340" y="150">Wazuh Agent</text>
+
+            <rect class="mini-box" x="40" y="220" width="190" height="40"/>
+            <text class="mini-label" x="135" y="235">SCA – Hardening</text>
+            <text class="mini-sub" x="135" y="250">CIS Benchmark</text>
+
+            <rect class="mini-box" x="260" y="220" width="110" height="40"/>
+            <text class="mini-label" x="315" y="235">HIDS</text>
+            <text class="mini-sub" x="315" y="250">Security Logs</text>
+
+            <rect class="mini-box" x="380" y="220" width="110" height="40"/>
+            <text class="mini-label" x="435" y="235">FIM</text>
+            <text class="mini-sub" x="435" y="250">File Changes</text>
+
+            <rect class="mini-box" x="500" y="220" width="140" height="40"/>
+            <text class="mini-label" x="570" y="235">Malware / IOC</text>
+            <text class="mini-sub" x="570" y="250">Hash / IP / Domain</text>
+
+            <rect class="mini-box" x="260" y="290" width="120" height="40"/>
+            <text class="mini-label" x="320" y="305">Wazuh Manager</text>
+            <text class="mini-sub" x="320" y="320">Rules & Alerts</text>
+
+            <rect class="mini-box" x="400" y="290" width="120" height="40"/>
+            <text class="mini-label" x="460" y="305">Wazuh Indexer</text>
+            <text class="mini-sub" x="460" y="320">Storage / Search</text>
+
+            <rect class="mini-box" x="560" y="170" width="120" height="40"/>
+            <text class="mini-label" x="620" y="185">Dashboard</text>
+            <text class="mini-sub" x="620" y="200">Views / Alerts</text>
+
+            <rect class="mini-box" x="560" y="270" width="120" height="40"/>
+            <text class="mini-label" x="620" y="285">MITRE Mapping</text>
+            <text class="mini-sub" x="620" y="300">Tactics / Techniques</text>
+
+            <rect class="mini-box" x="560" y="320" width="120" height="40"/>
+            <text class="mini-label" x="620" y="335">Threat Hunting</text>
+            <text class="mini-sub" x="620" y="350">IOC / Timeline</text>
+
+            <path id="p_ext_router"   class="link-line" d="M160,40 L220,40" marker-end="url(#arrow)"/>
+            <path id="p_int_victim"   class="link-line" d="M160,140 L260,140" marker-end="url(#arrow)"/>
+            <path id="p_router_fw"    class="link-line" d="M340,40 L400,40" marker-end="url(#arrow)"/>
+            <path id="p_fw_victim"    class="link-line" d="M460,60 L340,120" marker-end="url(#arrow)"/>
+
+            <path id="p_vic_hids"     class="link-line" d="M340,160 L315,230" marker-end="url(#arrow)"/>
+            <path id="p_vic_fim"      class="link-line" d="M340,160 L435,230" marker-end="url(#arrow)"/>
+            <path id="p_vic_mal"      class="link-line" d="M340,160 L570,230" marker-end="url(#arrow)"/>
+            <path id="p_vic_sca"      class="link-line" d="M340,160 L135,230" marker-end="url(#arrow)"/>
+
+            <path id="p_sca_mgr"      class="link-line" d="M135,250 L300,290" marker-end="url(#arrow)"/>
+            <path id="p_hids_mgr"     class="link-line" d="M315,250 L320,290" marker-end="url(#arrow)"/>
+            <path id="p_fim_mgr"      class="link-line" d="M435,250 L340,290" marker-end="url(#arrow)"/>
+            <path id="p_mal_mgr"      class="link-line" d="M570,250 L340,290" marker-end="url(#arrow)"/>
+
+            <path id="p_mgr_index"    class="link-line" d="M340,310 L400,310" marker-end="url(#arrow)"/>
+            <path id="p_index_dash"   class="link-line" d="M520,310 L620,190" marker-end="url(#arrow)"/>
+
+            <path id="p_dash_mitre"   class="link-line" d="M620,210 L620,270" marker-end="url(#arrow)"/>
+            <path id="p_mitre_hunt"   class="link-line" d="M620,300 L620,340" marker-end="url(#arrow)"/>
+
+            <circle id="flowDot" cx="-20" cy="-20" r="7"></circle>
+          </svg>
+        </div>
+
+        <div id="log-panel">
+          <div id="scenario-title">
+            <i class="fas fa-route"></i>
+            Select a scenario to visualize the security flow
+          </div>
+          <div id="log"></div>
+          <div class="progress-container">
+            <div class="progress-info">
+              <span class="progress-label">Scenario progress</span>
+              <span id="progress-percent" class="progress-percent">0%</span>
+            </div>
+            <div class="progress-bar">
+              <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <div class="timeline-indicator">
+              <div id="timeline-current" class="timeline-current"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tooltip" class="tooltip"></div>
+
+  <script>
+    (function initParticles() {
+      const container = document.getElementById("particles");
+      const count = 25;
+      for (let i = 0; i < count; i++) {
+        const p = document.createElement("div");
+        p.className = "particle";
+        const size = Math.random() * 6 + 3;
+        p.style.width = size + "px";
+        p.style.height = size + "px";
+        p.style.left = Math.random() * 100 + "%";
+        p.style.top = Math.random() * 100 + "%";
+        p.style.animationDuration = 10 + Math.random() * 20 + "s";
+        p.style.animationDelay = -Math.random() * 20 + "s";
+        container.appendChild(p);
+      }
+    })();
+
+    const dot = document.getElementById("flowDot");
+    const progressFill = document.getElementById("progress-fill");
+    const progressPercentEl = document.getElementById("progress-percent");
+    const timelineCurrent = document.getElementById("timeline-current");
+    const scenarioTitleEl = document.getElementById("scenario-title");
+    const logEl = document.getElementById("log");
+    const scenarioCards = Array.from(document.querySelectorAll(".scenario-card"));
+    const allNodeEls = Array.from(document.querySelectorAll(".node"));
+    const tooltip = document.getElementById("tooltip");
+    const alertBanner = document.getElementById("alertBanner");
+
+    const DEFAULT_TITLE = "Select a scenario to visualize the security flow";
+    const STEP_INTERVAL = 2000;
+
+    const pathsMini = {
+      hids: [
+        { x: 100, y: 40 },
+        { x: 280, y: 40 },
+        { x: 460, y: 40 },
+        { x: 340, y: 140 },
+        { x: 315, y: 230 },
+        { x: 320, y: 310 },
+        { x: 460, y: 310 },
+        { x: 620, y: 190 },
+        { x: 620, y: 285 },
+        { x: 620, y: 335 }
+      ],
+      fim: [
+        { x: 110, y: 140 },
+        { x: 340, y: 140 },
+        { x: 435, y: 230 },
+        { x: 320, y: 310 },
+        { x: 460, y: 310 },
+        { x: 620, y: 190 },
+        { x: 620, y: 285 },
+        { x: 620, y: 335 }
+      ],
+      malware: [
+        { x: 110, y: 140 },
+        { x: 340, y: 140 },
+        { x: 570, y: 230 },
+        { x: 320, y: 310 },
+        { x: 460, y: 310 },
+        { x: 620, y: 190 },
+        { x: 620, y: 285 },
+        { x: 620, y: 335 }
+      ],
+      sca: [
+        { x: 340, y: 140 },
+        { x: 135, y: 230 },
+        { x: 320, y: 310 },
+        { x: 460, y: 310 },
+        { x: 620, y: 190 }
+      ]
+    };
+
+    const pathSequences = {
+      hids: [
+        "p_ext_router",
+        "p_router_fw",
+        "p_fw_victim",
+        "p_vic_hids",
+        "p_hids_mgr",
+        "p_mgr_index",
+        "p_index_dash",
+        "p_dash_mitre",
+        "p_mitre_hunt"
+      ],
+      fim: [
+        "p_int_victim",
+        "p_vic_fim",
+        "p_fim_mgr",
+        "p_mgr_index",
+        "p_index_dash",
+        "p_dash_mitre",
+        "p_mitre_hunt"
+      ],
+      malware: [
+        "p_int_victim",
+        "p_vic_mal",
+        "p_mal_mgr",
+        "p_mgr_index",
+        "p_index_dash",
+        "p_dash_mitre",
+        "p_mitre_hunt"
+      ],
+      sca: [
+        "p_vic_sca",
+        "p_sca_mgr",
+        "p_mgr_index",
+        "p_index_dash"
+      ]
+    };
+
+    const scenarios = {
+      hids: {
+        label: "Scenario 1 – HIDS: brute-force từ External",
+        steps: [
+          { node: "external", desc: "External Threat Actor (Kali / Internet) phát sinh nhiều lần đăng nhập sai vào dịch vụ trên Windows Victim (SMB/RDP...)."},
+          { node: "router",  desc: "Lưu lượng brute-force đi qua Router / NAT (VirtualBox, modem, router) vào mạng nội bộ." },
+          { node: "fw",      desc: "Firewall / ACL cho phép hoặc chặn kết nối, ghi lại log bảo mật tương ứng." },
+          { node: "win",     desc: "Windows Victim sinh Windows Event Log (ví dụ Event ID 4625 – failed logon) cho từng lần đăng nhập sai." },
+          { node: "hids",    desc: "Wazuh Agent (HIDS) thu thập Security Log, gửi sự kiện đăng nhập thất bại về Wazuh Manager." },
+          { node: "manager", desc: "Wazuh Manager giải mã log, áp dụng ruleset HIDS, nhận dạng mẫu brute-force và gán mức độ nghiêm trọng." },
+          { node: "indexer", desc: "Alert và log đã phân tích được gửi sang Wazuh Indexer để index và lưu trữ lâu dài." },
+          { node: "dashboard", desc: "Wazuh Dashboard hiển thị cảnh báo brute-force gần thời gian thực cho SOC analyst." },
+          { node: "mitre",   desc: "MITRE ATT&CK Mapping đánh dấu kỹ thuật Brute Force / Credential Access trong ma trận." },
+          { node: "hunting", desc: "Threat Hunting: analyst truy vấn thêm theo IP nguồn, tài khoản, host để đánh giá phạm vi tấn công." }
+        ]
+      },
+      fim: {
+        label: "Scenario 2 – FIM: thay đổi file quan trọng do Internal User",
+        steps: [
+          { node: "internal", desc: "Internal User thao tác tạo / sửa / xóa file trong thư mục FIM-Test trên Windows Victim." },
+          { node: "win",      desc: "Windows Victim ghi nhận thay đổi trên file system tương ứng với thao tác của người dùng." },
+          { node: "fim",      desc: "Module FIM của Wazuh Agent phát hiện thay đổi (path, permissions, size, hash) và tạo sự kiện FIM." },
+          { node: "manager",  desc: "Wazuh Manager áp dụng rule FIM, đánh giá mức độ rủi ro của thay đổi (bình thường hay nghi vấn)." },
+          { node: "indexer",  desc: "Sự kiện FIM sau khi phân tích được lưu vào Wazuh Indexer để phục vụ truy vấn lịch sử." },
+          { node: "dashboard",desc: "Wazuh Dashboard hiển thị alert FIM, cho phép xem chi tiết before/after của file bị thay đổi." },
+          { node: "mitre",    desc: "MITRE mapping có thể gắn tactic/technique phù hợp với các thay đổi file bất thường (ví dụ Defense Evasion)." },
+          { node: "hunting",  desc: "Threat Hunting: analyst truy vấn theo đường dẫn file, user thực hiện, process liên quan để điều tra sâu." }
+        ]
+      },
+      malware: {
+        label: "Scenario 3 – Malware / IOC Detection: hash, IP, domain độc hại",
+        steps: [
+          { node: "internal", desc: "User hoặc malware trên Windows Victim chạy file hoặc kết nối mạng tới IP/domain nằm trong IOC list." },
+          { node: "win",      desc: "Windows Victim sinh log về file, process hoặc network connection tương ứng với hoạt động nghi vấn." },
+          { node: "malware",  desc: "Module Malware Detection / IOC so khớp hash, IP, domain với IOC list và phát hiện trùng khớp." },
+          { node: "manager",  desc: "Wazuh Manager nhận sự kiện IOC, áp dụng rule Malware/IOC và tạo alert mức High với chi tiết IOC." },
+          { node: "indexer",  desc: "Alert IOC được gửi sang Wazuh Indexer để index, phục vụ tìm kiếm toàn hệ thống." },
+          { node: "dashboard",desc: "Dashboard hiển thị cảnh báo malware/IOC, cho phép pivot theo IOC (host, user, thời gian)." },
+          { node: "mitre",    desc: "MITRE mapping gán kỹ thuật như Command and Control / Execution tùy loại IOC và hành vi." },
+          { node: "hunting",  desc: "Threat Hunting: analyst truy vấn Indexer để tìm host khác có cùng IOC, đánh giá phạm vi compromise." }
+        ]
+      },
+      sca: {
+        label: "Scenario 4 – SCA: đánh giá hardening theo CIS benchmark",
+        steps: [
+          { node: "win",     desc: "Theo lịch hoặc chạy thủ công, Wazuh Agent kích hoạt bài quét SCA trên Windows Victim." },
+          { node: "sca",     desc: "Module SCA kiểm tra policy, dịch vụ, registry, account… và tạo kết quả PASS/FAIL cho từng rule CIS." },
+          { node: "manager", desc: "Wazuh Manager nhận kết quả SCA, chuẩn hóa dữ liệu và gán mức ưu tiên cho các mục FAIL quan trọng." },
+          { node: "indexer", desc: "Kết quả SCA được lưu trữ tại Wazuh Indexer để so sánh và báo cáo trend hardening theo thời gian." },
+          { node: "dashboard", desc: "Dashboard cung cấp bảng báo cáo hardening, tỉ lệ PASS/FAIL và hỗ trợ theo dõi remediation." }
+        ]
+      }
+    };
+
+    const allNodeIds = allNodeEls.map(el => el.id);
+    let currentTimers = [];
+    let currentAnimFrame = null;
+    let currentScenarioKey = null;
+    let paused = false;
+
+    function clearActiveNodes() {
+      allNodeEls.forEach(el => el.classList.remove("active"));
+    }
+
+    function highlightNode(id) {
+      clearActiveNodes();
+      const el = document.getElementById(id);
+      if (el) el.classList.add("active");
+    }
+
+    function appendLog(stepIndex, desc, nodeId) {
+      const line = document.createElement("div");
+      line.className = "log-line";
+      line.innerHTML =
+        '<span class="log-step">' + stepIndex + '</span>' +
+        '<span class="log-node">[' + nodeId + ']</span>' +
+        '<span class="log-desc"> ' + desc + '</span>';
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setScenarioCardsActive(key) {
+      scenarioCards.forEach(card => {
+        if (card.dataset.scenario === key) card.classList.add("active");
+        else card.classList.remove("active");
+      });
+    }
+
+    function resetDot() {
+      dot.setAttribute("cx", -20);
+      dot.setAttribute("cy", -20);
+    }
+
+    function clearActivePaths() {
+      document.querySelectorAll(".link-line").forEach(p => p.classList.remove("active-path"));
+    }
+
+    function activatePath(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.add("active-path");
+    }
+
+    function animateMini(key) {
+      const points = pathsMini[key];
+      if (!points || points.length < 2) return;
+
+      if (currentAnimFrame) {
+        cancelAnimationFrame(currentAnimFrame);
+        currentAnimFrame = null;
+      }
+
+      paused = false;
+      let segment = 0;
+      let startTime = null;
+      const segmentDuration = STEP_INTERVAL;
+
+      function step(timestamp) {
+        if (paused) {
+          currentAnimFrame = null;
+          return;
+        }
+        if (!startTime) startTime = timestamp;
+        let progress = (timestamp - startTime) / segmentDuration;
+        if (progress > 1) progress = 1;
+
+        const p0 = points[segment];
+        const p1 = points[segment + 1];
+        const x = p0.x + (p1.x - p0.x) * progress;
+        const y = p0.y + (p1.y - p0.y) * progress;
+        dot.setAttribute("cx", x);
+        dot.setAttribute("cy", y);
+
+        if (progress >= 1) {
+          const seq = pathSequences[key] || [];
+          if (segment < seq.length) {
+            activatePath(seq[segment]);
+          }
+
+          segment++;
+          startTime = timestamp;
+          if (segment >= points.length - 1) {
+            currentAnimFrame = null;
+            return;
+          }
+        }
+        currentAnimFrame = requestAnimationFrame(step);
+      }
+
+      currentAnimFrame = requestAnimationFrame(step);
+    }
+
+    function clearTimers() {
+      currentTimers.forEach(t => clearTimeout(t));
+      currentTimers = [];
+    }
+
+    function stopAnimation(fromScenario = false) {
+      clearTimers();
+      if (currentAnimFrame) {
+        cancelAnimationFrame(currentAnimFrame);
+        currentAnimFrame = null;
+      }
+      paused = false;
+      resetDot();
+      clearActiveNodes();
+      clearActivePaths();
+      progressFill.style.width = "0%";
+      timelineCurrent.style.width = "0%";
+      progressPercentEl.textContent = "0%";
+      alertBanner.style.display = "none";
+
+      if (!fromScenario) {
+        scenarioTitleEl.innerHTML = '<i class="fas fa-route"></i> ' + DEFAULT_TITLE;
+        scenarioCards.forEach(c => c.classList.remove("active"));
+        logEl.textContent = "";
+      }
+    }
+
+    function runScenario(key) {
+      const scenario = scenarios[key];
+      if (!scenario) return;
+
+      stopAnimation(true);
+
+      currentScenarioKey = key;
+      setScenarioCardsActive(key);
+      scenarioTitleEl.innerHTML = '<i class="fas fa-route"></i> ' + scenario.label;
+      logEl.textContent = "";
+      progressFill.style.width = "0%";
+      timelineCurrent.style.width = "0%";
+      progressPercentEl.textContent = "0%";
+      clearActivePaths();
+
+      if (key === "hids") {
+        alertBanner.style.display = "flex";
+        setTimeout(() => {
+          if (currentScenarioKey === "hids") {
+            alertBanner.style.display = "none";
+          }
+        }, 4000);
+      } else {
+        alertBanner.style.display = "none";
+      }
+
+      const total = scenario.steps.length;
+      const seq = pathSequences[key] || [];
+
+      scenario.steps.forEach((step, index) => {
+        const delay = STEP_INTERVAL * index;
+        const timer = setTimeout(() => {
+          highlightNode(step.node);
+          appendLog(index + 1, step.desc, step.node);
+
+          if (index > 0 && index - 1 < seq.length) {
+            activatePath(seq[index - 1]);
+          }
+
+          const percent = Math.round(((index + 1) / total) * 100);
+          progressFill.style.width = percent + "%";
+          timelineCurrent.style.width = percent + "%";
+          progressPercentEl.textContent = percent + "%";
+        }, delay);
+        currentTimers.push(timer);
+      });
+
+      animateMini(key);
+    }
+
+    const tooltipNodes = document.querySelectorAll(".node[data-tooltip]");
+    tooltipNodes.forEach(node => {
+      node.addEventListener("mouseenter", () => {
+        tooltip.textContent = node.dataset.tooltip || "";
+        tooltip.style.opacity = "1";
+      });
+      node.addEventListener("mousemove", (e) => {
+        tooltip.style.left = e.clientX + "px";
+        tooltip.style.top = e.clientY + "px";
+      });
+      node.addEventListener("mouseleave", () => {
+        tooltip.style.opacity = "0";
+      });
+    });
+  </script>
+</body>
+</html>
